@@ -4,16 +4,24 @@ import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
+import type { VendorOption } from "@/services/api";
+
 type QuickstartPreCallCardProps = {
 	isLoading: boolean;
 	error: string | null;
 	onStartConversation: () => void;
+	vendors?: VendorOption[];
+	selectedVendor?: string;
+	onVendorChange?: (vendor: string) => void;
 };
 
 export function QuickstartPreCallCard({
 	isLoading,
 	error,
 	onStartConversation,
+	vendors,
+	selectedVendor,
+	onVendorChange,
 }: QuickstartPreCallCardProps) {
 	return (
 		<div
@@ -31,6 +39,35 @@ export function QuickstartPreCallCard({
 				via REALTIME_VENDOR — no separate STT/LLM/TTS. BYO key for the selected
 				vendor.
 			</p>
+
+			{vendors && vendors.length > 0 ? (
+				<div className="mt-6 w-full text-left">
+					<label
+						htmlFor="realtime-vendor"
+						className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+					>
+						Realtime vendor
+					</label>
+					<select
+						id="realtime-vendor"
+						value={selectedVendor}
+						onChange={(e) => onVendorChange?.(e.target.value)}
+						disabled={isLoading}
+						className="mt-2 h-10 w-full rounded-lg border border-[#2b2b2b] bg-[#101010] px-3 text-sm text-white"
+					>
+						{vendors.map((v) => (
+							<option key={v.name} value={v.name}>
+								{v.name}
+								{v.needs_key ? "  (needs key)" : "  (key-less)"}
+							</option>
+						))}
+					</select>
+					<p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+						This recipe is BYO-only — every vendor needs its env vars set on the
+						server, otherwise startup reports which are missing.
+					</p>
+				</div>
+			) : null}
 
 			<Button
 				onClick={onStartConversation}

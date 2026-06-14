@@ -63,9 +63,10 @@ class Agent:
         channel_name: str,
         agent_uid: int,
         user_uid: int,
+        vendor: Optional[str] = None,
         output_audio_codec: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Start realtime voice agent."""
+        """Start realtime voice agent with the selected MLLM vendor."""
         if not channel_name or not str(channel_name).strip():
             raise ValueError("channel_name is required and cannot be empty")
         if agent_uid <= 0:
@@ -75,11 +76,14 @@ class Agent:
 
         name = f"agent_{channel_name}_{agent_uid}_{int(time.time())}"
 
+        # The in-UI switcher passes `vendor`; otherwise fall back to REALTIME_VENDOR.
+        selected = (vendor or self.vendor).strip()
+
         # Build the selected MLLM vendor. This raises ValueError listing the
         # missing env var(s) when a BYO vendor is selected without credentials —
         # validated here (start()), so /get_config and the docker smoke stay
         # key-less.
-        mllm = build_vendor(self.vendor)
+        mllm = build_vendor(selected)
 
         parameters = {
             "data_channel": "rtm",
@@ -114,7 +118,7 @@ class Agent:
             channel_name,
             agent_uid,
             user_uid,
-            self.vendor,
+            selected,
         )
 
         try:
@@ -140,6 +144,7 @@ class Agent:
         return {
             "agent_id": agent_id,
             "channel_name": channel_name,
+            "vendor": selected,
             "status": "started",
         }
 

@@ -1,66 +1,106 @@
-"""Vendor registry — data-driven switchboard over the A4.1 REALTIME vendors."""
+"""Realtime MLLM vendor registry — one readable builder per Agora-supported
+realtime (voice-to-voice) vendor.
+
+Each `build_<vendor>(env)` is a self-contained, copy-pasteable example of wiring
+that vendor into an Agora Conversational AI agent as a single realtime MLLM: it
+shows the real SDK constructor call, the `server_vad` turn detection it owns, and
+exactly which env vars it needs. `build_vendor(name)` selects one by
+`REALTIME_VENDOR`. Optional `REALTIME_MODEL` overrides the model.
+
+This recipe is BYO-only: every vendor (including the default `openai`) requires
+its own credentials, so every builder reads at least one required env var.
+
+Add or change a vendor by editing its builder below + the REGISTRY line.
+"""
 import os
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
-from agora_agent.agentkit import vendors as V
+from agora_agent.agentkit.vendors import (
+    OpenAIRealtime, GeminiLive, XaiGrok, VertexAI,
+)
 
-CATEGORY = "REALTIME"   # one of: STT | LLM | TTS | REALTIME  (per repo)
+CATEGORY = "REALTIME"
 
-
-@dataclass
-class VendorSpec:
-    cls: Callable[..., Any]
-    creds: Dict[str, str] = field(default_factory=dict)   # sdk_field -> ENV_VAR (required, no default)
-    defaults: Dict[str, Any] = field(default_factory=dict)  # sdk_field -> default value
-    model_field: Optional[str] = None   # field overridden by {CATEGORY}_MODEL
-    voice_field: Optional[str] = None   # field overridden by {CATEGORY}_VOICE
+# Turn detection is owned by the realtime MLLM (no top-level cascading VAD).
+TURN_DETECTION = {"mode": "server_vad"}
 
 
-TD = {"mode": "server_vad"}
-SPECS: Dict[str, VendorSpec] = {
-  "openai":   VendorSpec(V.OpenAIRealtime, {"api_key": "OPENAI_API_KEY"},
-                {"model": "gpt-4o-realtime-preview", "turn_detection": TD}, model_field="model"),
-  "gemini":   VendorSpec(V.GeminiLive, {"api_key": "GEMINI_API_KEY"},
-                {"model": "gemini-2.0-flash-live-001", "turn_detection": TD}, model_field="model"),
-  "xai":      VendorSpec(V.XaiGrok, {"api_key": "XAI_API_KEY"},
-                {"turn_detection": TD}),
-  "vertexai": VendorSpec(V.VertexAI,
-                {"adc_credentials_string": "GOOGLE_APPLICATION_CREDENTIALS_JSON",
-                 "project_id": "GOOGLE_PROJECT_ID", "location": "GOOGLE_LOCATION"},
-                {"model": "gemini-2.0-flash-live-001", "turn_detection": TD}, model_field="model"),
+def _model(env, default: str) -> str:
+    """The selected model, overridable with REALTIME_MODEL."""
+    return env.get("REALTIME_MODEL") or default
+
+
+# --- one builder per vendor (these are the samples) -------------------------
+
+def build_openai(env):
+    """OpenAI Realtime — set OPENAI_API_KEY (platform.openai.com)."""
+    return OpenAIRealtime(
+        api_key=env["OPENAI_API_KEY"],
+        model=_model(env, "gpt-4o-realtime-preview"),
+        turn_detection=TURN_DETECTION,
+    )
+
+
+def build_gemini(env):
+    """Google Gemini Live — set GEMINI_API_KEY (aistudio.google.com)."""
+    return GeminiLive(
+        api_key=env["GEMINI_API_KEY"],
+        model=_model(env, "gemini-2.0-flash-live-001"),
+        turn_detection=TURN_DETECTION,
+    )
+
+
+def build_xai(env):
+    """xAI Grok realtime — set XAI_API_KEY (console.x.ai)."""
+    return XaiGrok(
+        api_key=env["XAI_API_KEY"],
+        turn_detection=TURN_DETECTION,
+    )
+
+
+def build_vertexai(env):
+    """Google Vertex AI realtime — set GOOGLE_APPLICATION_CREDENTIALS_JSON,
+    GOOGLE_PROJECT_ID, GOOGLE_LOCATION (service-account ADC)."""
+    return VertexAI(
+        adc_credentials_string=env["GOOGLE_APPLICATION_CREDENTIALS_JSON"],
+        project_id=env["GOOGLE_PROJECT_ID"],
+        location=env["GOOGLE_LOCATION"],
+        model=_model(env, "gemini-2.0-flash-live-001"),
+        turn_detection=TURN_DETECTION,
+    )
+
+
+# --- registry: name -> (builder, required env vars) -------------------------
+# BYO-only: every vendor requires at least one env var (no key-less default).
+REGISTRY: Dict[str, Tuple[Callable, List[str]]] = {
+    "openai":   (build_openai,   ["OPENAI_API_KEY"]),
+    "gemini":   (build_gemini,   ["GEMINI_API_KEY"]),
+    "xai":      (build_xai,      ["XAI_API_KEY"]),
+    "vertexai": (build_vertexai, ["GOOGLE_APPLICATION_CREDENTIALS_JSON", "GOOGLE_PROJECT_ID", "GOOGLE_LOCATION"]),
 }
 
 
 def available() -> List[str]:
-    return sorted(SPECS)
+    return sorted(REGISTRY)
 
 
 def required_env(name: str) -> List[str]:
-    return list(SPECS[name].creds.values())
+    return list(REGISTRY[name][1])
+
+
+def needs_key(name: str) -> bool:
+    return bool(REGISTRY[name][1])
 
 
 def build_vendor(name: str, env: Optional[Dict[str, str]] = None):
+    """Build the selected vendor; raises ValueError naming any missing env vars."""
     env = env if env is not None else os.environ
-    if name not in SPECS:
+    if name not in REGISTRY:
         raise ValueError(f"unknown {CATEGORY} vendor '{name}'; choose one of {available()}")
-    spec = SPECS[name]
-    kwargs: Dict[str, Any] = dict(spec.defaults)
-    # generic model/voice overrides
-    if spec.model_field and env.get(f"{CATEGORY}_MODEL"):
-        kwargs[spec.model_field] = env[f"{CATEGORY}_MODEL"]
-    if spec.voice_field and env.get(f"{CATEGORY}_VOICE"):
-        kwargs[spec.voice_field] = env[f"{CATEGORY}_VOICE"]
-    # required creds + infra from env
-    missing: List[str] = []
-    for sdk_field, var in spec.creds.items():
-        val = env.get(var)
-        if not val:
-            missing.append(var)
-        else:
-            kwargs[sdk_field] = val
+    builder, required = REGISTRY[name]
+    missing = [var for var in required if not env.get(var)]
     if missing:
         raise ValueError(
             f"{CATEGORY} vendor '{name}' requires environment variable(s): {', '.join(missing)}"
         )
-    return spec.cls(**kwargs)
+    return builder(env)

@@ -26,14 +26,18 @@ no separate STT/LLM/TTS. Turn detection is MLLM-owned (`server_vad`). No tools
 
 ## Vendor registry
 
-- `server/src/vendors.py` holds `CATEGORY = "REALTIME"`, the `SPECS` table (all
-  four A4.1 realtime vendors: `openai`, `gemini`, `xai`, `vertexai`), and
-  `build_vendor()` / `required_env()` / `available()`.
+- `server/src/vendors.py` holds `CATEGORY = "REALTIME"`, one readable
+  `build_<vendor>(env)` function per vendor (all four A4.1 realtime vendors:
+  `openai`, `gemini`, `xai`, `vertexai`), a `REGISTRY: {name: (builder,
+  [required_env])}`, and `build_vendor()` / `required_env()` / `needs_key()` /
+  `available()`.
 - `agent.py` reads `REALTIME_VENDOR` in `__init__` (no validation) and calls
-  `build_vendor(self.vendor)` for the MLLM leg **in `start()`** — BYO credential
-  validation happens there, so `/get_config` stays key-less.
+  `build_vendor(selected)` for the MLLM leg **in `start()`** — where `selected`
+  is the in-UI `vendor` (from `GET /vendors` + the pre-call dropdown) or
+  `REALTIME_VENDOR`. BYO credential validation happens there, so `/get_config`
+  stays key-less.
 - The MLLM is attached with `.with_mllm()` only; never `.with_stt/.with_llm/.with_tts`.
-- Each spec default sets `turn_detection={"mode": "server_vad"}` (MLLM-owned).
+- Each builder sets `turn_detection={"mode": "server_vad"}` (MLLM-owned).
 
 ## Routing / ownership
 
@@ -68,8 +72,9 @@ no separate STT/LLM/TTS. Turn detection is MLLM-owned (`server_vad`). No tools
 - Keep token generation and the App Certificate in `server/`.
 - The selected vendor's creds are validated in `agent.start()` via `build_vendor`
   — the server boots without them, but `/startAgent` returns 400 until they are set.
-- Add or change realtime vendors only in the `SPECS` table in `vendors.py`; the
-  framework (`build_vendor`/`required_env`/`available`) is shared across the
+- Add or change realtime vendors by editing the relevant `build_<vendor>`
+  function + its `REGISTRY` line in `vendors.py`; the framework
+  (`build_vendor`/`required_env`/`needs_key`/`available`) is shared across the
   sibling vendor recipes — keep it identical.
 - `turn_detection` is MLLM-owned (`server_vad`); do not set a top-level
   `turn_detection` on `AgoraAgent(...)` when using `.with_mllm()`.

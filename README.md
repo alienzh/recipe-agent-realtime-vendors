@@ -19,9 +19,14 @@ credentials are validated **when the agent starts** (not at construction), so
 
 ## Vendors
 
-Pick a vendor with `REALTIME_VENDOR`; supply its required env vars; optionally
-override the model with `REALTIME_MODEL`. Turn detection (`server_vad`) is owned
-by the MLLM.
+Two ways to pick a vendor:
+- **In the UI** — the pre-call screen has a **Realtime vendor dropdown**; choose
+  one and start. No restart needed. (This recipe is BYO-only, so every vendor
+  still requires its env vars set on the server; if they're missing, startup
+  reports exactly which.)
+- **By env** — set `REALTIME_VENDOR` (the default for the dropdown) + the vendor's
+  keys in `server/.env.local`; optionally override the model with `REALTIME_MODEL`.
+  Turn detection (`server_vad`) is owned by the MLLM.
 
 | Vendor | `REALTIME_VENDOR` | Required env | Default model |
 | --- | --- | --- | --- |
@@ -30,9 +35,45 @@ by the MLLM.
 | xAI Grok | `xai` | `XAI_API_KEY` | _(SDK default)_ |
 | Vertex AI | `vertexai` | `GOOGLE_APPLICATION_CREDENTIALS_JSON`, `GOOGLE_PROJECT_ID`, `GOOGLE_LOCATION` | `gemini-2.0-flash-live-001` |
 
-This recipe is **BYO-only**: there is no keyless default. The selected vendor's
-credentials are validated **when the agent starts**, so `/get_config` works
-key-less.
+This recipe is **BYO-only**: there is no keyless default — every vendor (including
+the default `openai`) needs its own key. The selected vendor's credentials are
+validated **when the agent starts**, so `/get_config` works key-less.
+
+### Sample code — how each vendor is wired
+
+Every vendor is a small, copy-pasteable builder in [`server/src/vendors.py`](server/src/vendors.py)
+that shows the real SDK constructor and the `server_vad` turn detection the MLLM
+owns. For example:
+
+```python
+from agora_agent.agentkit.vendors import OpenAIRealtime, GeminiLive, XaiGrok
+
+TURN_DETECTION = {"mode": "server_vad"}
+
+# OpenAI Realtime — set OPENAI_API_KEY:
+OpenAIRealtime(
+    api_key=env["OPENAI_API_KEY"],
+    model="gpt-4o-realtime-preview",
+    turn_detection=TURN_DETECTION,
+)
+
+# Gemini Live — set GEMINI_API_KEY:
+GeminiLive(
+    api_key=env["GEMINI_API_KEY"],
+    model="gemini-2.0-flash-live-001",
+    turn_detection=TURN_DETECTION,
+)
+
+# xAI Grok — set XAI_API_KEY:
+XaiGrok(
+    api_key=env["XAI_API_KEY"],
+    turn_detection=TURN_DETECTION,
+)
+```
+
+The agent attaches the chosen one with `.with_mllm(build_vendor(name))` — there is
+no STT/LLM/TTS cascade. To add or change a vendor, edit its `build_<vendor>`
+function + the `REGISTRY` line.
 
 ## Prerequisites
 
@@ -64,8 +105,9 @@ bun run dev
 
 Open [http://localhost:3000](http://localhost:3000) → **Start Conversation** → speak.
 
-To try a different realtime vendor, set `REALTIME_VENDOR` and that vendor's keys
-in `server/.env.local` (see [Vendors](#vendors)), then restart.
+To try a different realtime vendor, pick it from the **dropdown** on the pre-call
+screen (no restart). Because this recipe is BYO-only, set that vendor's keys in
+`server/.env.local` first (see [Vendors](#vendors)).
 
 ### Working from a clone
 
@@ -138,15 +180,16 @@ Next.js  ──rewrite──▶  Agent backend  (server/, localhost:8000)
                        User hears realtime voice response
 ```
 
-The realtime vendor switchboard lives in `server/src/vendors.py` — a data-driven
-registry mapping each vendor to `{cls, creds, defaults}`. No cascading STT/LLM/TTS
-vendors. No `llm/` service. See [ARCHITECTURE.md](./ARCHITECTURE.md).
+The realtime vendor switchboard lives in `server/src/vendors.py` — one readable
+`build_<vendor>` function per vendor (the sample code) plus a `REGISTRY` mapping
+name → builder + required env. No cascading STT/LLM/TTS vendors. No `llm/`
+service. See [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## What You Get
 
-- A **vendor switchboard** for the realtime MLLM leg: one `build_vendor()` over a
-  `SPECS` table covering all four A4.1 realtime vendors, selected via
-  `REALTIME_VENDOR`.
+- A **vendor switchboard** for the realtime MLLM leg: one readable `build_<vendor>`
+  builder per vendor plus a `REGISTRY`, covering all four A4.1 realtime vendors,
+  selected via `REALTIME_VENDOR` or the in-UI dropdown.
 - A **Next.js** web client (:3000) that drives the RTC/RTM lifecycle and only ever calls `/api/*`.
 - A **FastAPI** agent backend (:8000) that owns Agora token generation and the agent session lifecycle.
 - **Realtime MLLM** attached via `.with_mllm()` — replaces the cascading STT→LLM→TTS with a single voice-to-voice model.
@@ -171,7 +214,7 @@ vendors. No `llm/` service. See [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 - `web/` — Next.js frontend (:3000); RTC/RTM lifecycle and UI.
 - `server/` — FastAPI agent backend (:8000); Agora tokens + agent lifecycle, realtime MLLM.
-- `server/src/vendors.py` — the data-driven realtime vendor registry.
+- `server/src/vendors.py` — one readable builder per realtime vendor + the registry.
 - `ARCHITECTURE.md` — system shape and component boundaries.
 - `AGENTS.md` — guide for coding agents working in this repo.
 
