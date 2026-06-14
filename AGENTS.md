@@ -2,15 +2,15 @@
 
 For coding agents working in `recipe-agent-realtime-vendors`. This repository is
 the **realtime vendors** recipe in the Agora Conversational AI recipes family:
-the realtime MLLM leg is a data-driven switchboard over every A4.1 realtime
-vendor, selected via `REALTIME_VENDOR`. The MLLM replaces the cascade and is
+the realtime MLLM leg is a per-vendor switchboard (one readable `build_<vendor>`
+per vendor) selected via `REALTIME_VENDOR`. The MLLM replaces the cascade and is
 attached with `.with_mllm()` only.
 
 ## System shape
 
 - **`server/`** — Python FastAPI agent backend (:8000). Owns Agora token
   generation and agent session lifecycle. The realtime MLLM leg is built from the
-  data-driven registry in `server/src/vendors.py` and attached via `.with_mllm()`
+  per-vendor builder registry in `server/src/vendors.py` and attached via `.with_mllm()`
   — it replaces the STT/LLM/TTS cascade. SDK: `agora-agents>=2.0.0`
   (`import agora_agent`).
 - **`web/`** — Next.js 16 / React 19 / TypeScript frontend (:3000).
