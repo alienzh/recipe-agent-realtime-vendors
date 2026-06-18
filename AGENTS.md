@@ -11,7 +11,7 @@ attached with `.with_mllm()` only.
 - **`server/`** — Python FastAPI agent backend (:8000). Owns Agora token
   generation and agent session lifecycle. The realtime MLLM leg is built from the
   per-vendor builder registry in `server/src/vendors.py` and attached via `.with_mllm()`
-  — it replaces the STT/LLM/TTS cascade. SDK: `agora-agents>=2.0.0`
+  — it replaces the STT/LLM/TTS cascade. SDK: `agora-agents>=2.3.0`
   (`import agora_agent`).
 - **`web/`** — Next.js 16 / React 19 / TypeScript frontend (:3000).
 - Auth: Token007 from `AGORA_APP_ID` + `AGORA_APP_CERTIFICATE`.
