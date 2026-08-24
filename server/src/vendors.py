@@ -16,7 +16,7 @@ import os
 from typing import Callable, Dict, List, Optional, Tuple
 
 from agora_agent.agentkit.vendors import (
-    OpenAIRealtime, GeminiLive, XaiGrok, VertexAI,
+    AzureOpenAIRealtime, OpenAIRealtime, GeminiLive, XaiGrok, VertexAI,
 )
 
 CATEGORY = "REALTIME"
@@ -37,6 +37,20 @@ def build_openai(env):
     return OpenAIRealtime(
         api_key=env["OPENAI_API_KEY"],
         model=_model(env, "gpt-4o-realtime-preview"),
+        turn_detection=TURN_DETECTION,
+    )
+
+
+def build_azure(env):
+    """Azure OpenAI Realtime - set Azure API key, WebSocket URL, and deployment."""
+    return AzureOpenAIRealtime(
+        api_key=env["AZURE_OPENAI_API_KEY"],
+        url=env["AZURE_OPENAI_REALTIME_URL"],
+        model=env["AZURE_OPENAI_REALTIME_MODEL"],
+        voice="alloy",
+        instructions="You are a Conversational AI Agent, developed by Agora.",
+        output_modalities=["audio"],
+        max_history=20,
         turn_detection=TURN_DETECTION,
     )
 
@@ -74,6 +88,7 @@ def build_vertexai(env):
 # BYO-only: every vendor requires at least one env var (no key-less default).
 REGISTRY: Dict[str, Tuple[Callable, List[str]]] = {
     "openai":   (build_openai,   ["OPENAI_API_KEY"]),
+    "azure":    (build_azure,    ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_REALTIME_URL", "AZURE_OPENAI_REALTIME_MODEL"]),
     "gemini":   (build_gemini,   ["GEMINI_API_KEY"]),
     "xai":      (build_xai,      ["XAI_API_KEY"]),
     "vertexai": (build_vertexai, ["GOOGLE_APPLICATION_CREDENTIALS_JSON", "GOOGLE_PROJECT_ID", "GOOGLE_LOCATION"]),
