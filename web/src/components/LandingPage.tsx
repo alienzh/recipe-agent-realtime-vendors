@@ -241,6 +241,7 @@ export default function LandingPage() {
 										<ConversationComponent
 											agoraData={agoraData}
 											rtmClient={rtmClient}
+											vendor={selectedVendor || "openai"}
 											onTokenWillExpire={handleTokenWillExpire}
 											onEndConversation={handleEndConversation}
 										/>

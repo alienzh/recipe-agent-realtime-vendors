@@ -9,13 +9,21 @@ export type QuickstartAgentMetric = {
 
 type QuickstartPipelineMetricsProps = {
 	metrics: QuickstartAgentMetric[];
+	vendor?: string;
 };
 
-const PIPELINE = [
-	{ key: "stt", label: "Deepgram STT", metricTypes: ["stt", "asr"] },
-	{ key: "llm", label: "OpenAI LLM", metricTypes: ["llm", "mllm"] },
-	{ key: "tts", label: "MiniMax TTS", metricTypes: ["tts"] },
-] as const;
+const VENDOR_LABELS: Record<string, string> = {
+	openai: "OpenAI Realtime MLLM",
+	azure: "Azure OpenAI Realtime MLLM",
+	gemini: "Gemini Live MLLM",
+	xai: "xAI Grok MLLM",
+	vertexai: "Vertex AI MLLM",
+};
+
+function getVendorLabel(vendor?: string) {
+	if (!vendor) return "Realtime MLLM";
+	return VENDOR_LABELS[vendor] ?? `${vendor} MLLM`;
+}
 
 function formatMetricName(name: string) {
 	return name.replace(/[_-]+/g, " ");
@@ -23,18 +31,27 @@ function formatMetricName(name: string) {
 
 export function QuickstartPipelineMetrics({
 	metrics,
+	vendor,
 }: QuickstartPipelineMetricsProps) {
 	const latestByType = new Map<string, QuickstartAgentMetric>();
 	for (const metric of metrics) {
 		latestByType.set(metric.type.toLowerCase(), metric);
 	}
 
+	const pipeline = [
+		{
+			key: "mllm",
+			label: getVendorLabel(vendor),
+			metricTypes: ["mllm", "llm"],
+		},
+	] as const;
+
 	return (
 		<div className="flex min-w-0 flex-wrap items-center gap-2">
 			<span className="text-sm font-medium leading-6 text-muted-foreground">
 				Pipeline
 			</span>
-			{PIPELINE.map((step, index) => {
+			{pipeline.map((step, index) => {
 				const metric = step.metricTypes
 					.map((type) => latestByType.get(type))
 					.find(Boolean);

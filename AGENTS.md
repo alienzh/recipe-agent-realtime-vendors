@@ -3,7 +3,7 @@
 For coding agents working in `recipe-agent-realtime-vendors`. This repository is
 the **realtime vendors** recipe in the Agora Conversational AI recipes family:
 the realtime MLLM leg is a per-vendor switchboard (one readable `build_<vendor>`
-per vendor) selected via `REALTIME_VENDOR`. The MLLM replaces the cascade and is
+per vendor) defaulted by `REALTIME_VENDOR` and overridable in the UI. The MLLM replaces the cascade and is
 attached with `.with_mllm()` only.
 
 ## System shape
@@ -11,12 +11,12 @@ attached with `.with_mllm()` only.
 - **`server/`** — Python FastAPI agent backend (:8000). Owns Agora token
   generation and agent session lifecycle. The realtime MLLM leg is built from the
   per-vendor builder registry in `server/src/vendors.py` and attached via `.with_mllm()`
-  — it replaces the STT/LLM/TTS cascade. SDK: `agora-agents>=2.3.0`
+  — it replaces the STT/LLM/TTS cascade. SDK: `agora-agents>=2.6.0`
   (`import agora_agent`).
 - **`web/`** — Next.js 16 / React 19 / TypeScript frontend (:3000).
 - Auth: Token007 from `AGORA_APP_ID` + `AGORA_APP_CERTIFICATE`.
 - No `llm/` service — single-process, MLLM is **BYO-only** (every vendor,
-  including the default `openai`, requires its own API key).
+  including the default `openai`, requires provider credentials).
 
 ## Pipeline
 
@@ -27,8 +27,8 @@ no separate STT/LLM/TTS. Turn detection is MLLM-owned (`server_vad`). No tools
 ## Vendor registry
 
 - `server/src/vendors.py` holds `CATEGORY = "REALTIME"`, one readable
-  `build_<vendor>(env)` function per vendor (all four A4.1 realtime vendors:
-  `openai`, `gemini`, `xai`, `vertexai`), a `REGISTRY: {name: (builder,
+  `build_<vendor>(env)` function per vendor (`openai`, `azure`, `gemini`,
+  `xai`, `vertexai`), a `REGISTRY: {name: (builder,
   [required_env])}`, and `build_vendor()` / `required_env()` / `needs_key()` /
   `available()`.
 - `agent.py` reads `REALTIME_VENDOR` in `__init__` (no validation) and calls
@@ -62,8 +62,9 @@ no separate STT/LLM/TTS. Turn detection is MLLM-owned (`server_vad`). No tools
 | `AGORA_APP_ID` | — | required |
 | `AGORA_APP_CERTIFICATE` | — | required |
 | `REALTIME_VENDOR` | `openai` | which realtime MLLM vendor to build (see README Vendors table) |
-| `REALTIME_MODEL` | per-vendor | optional model override for the selected vendor |
-| _vendor creds_ | — | **required** for the selected vendor (BYO-only); `required_env(REALTIME_VENDOR)` |
+| `REALTIME_MODEL` | per-vendor | optional model override where supported; Azure uses its required deployment setting |
+| _vendor creds_ | — | **required** for the selected vendor (BYO-only); `required_env(selected vendor)` |
+| `AZURE_OPENAI_API_KEY` / `URL` / `MODEL` | — | required for the Azure vendor |
 | `AGENT_GREETING` | built-in | Optional opening line override |
 
 ## Patterns

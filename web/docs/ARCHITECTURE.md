@@ -29,7 +29,7 @@
 - Local/Test/Prod differences: root `bun run dev` exports `AGENT_BACKEND_URL=http://localhost:8000`; deploys must set it on the web host
 - Entry point: `web/app/page.tsx` renders `LandingPage`
 - Default port: 3000 for Next.js, 8000 for FastAPI
-- Secrets handling: keep Agora certificate and BYOK keys out of `web/`
+- Secrets handling: keep Agora certificate and BYOK credentials out of `web/`
 
 ## 4. Dependencies & External Services
 
@@ -39,7 +39,8 @@
   - `agora-agent-client-toolkit` and `agora-agent-uikit` for transcript, state, metrics, and visualizer UI
 - Backend service:
   - Python FastAPI owns token generation and agent lifecycle through `agora-agents`
-- Third-party services: Agora Conversational AI managed STT/LLM/TTS pipeline
+- Third-party services: selected BYO realtime MLLM through Agora Conversational
+  AI (OpenAI Realtime, Azure OpenAI Realtime, Gemini Live, xAI, or Vertex AI)
 
 ## 5. Module Responsibilities & Directory Structure
 
@@ -61,9 +62,9 @@ web/
 
 - Routing: single App Router page at `/`
 - Data flow:
-  1. `LandingPage` calls `GET /api/get_config`
-  2. Next rewrites to FastAPI `/get_config`
-  3. Browser starts the agent via `POST /api/startAgent`, logs into RTM, and renders `ConversationComponent`
+  1. `LandingPage` calls `GET /api/vendors` to populate the vendor selector and `GET /api/get_config`
+  2. Next rewrites browser API calls to FastAPI `/vendors` and `/get_config`
+  3. Browser starts the agent via `POST /api/startAgent` with the selected vendor, logs into RTM, and renders `ConversationComponent`
   4. `ConversationComponent` joins RTC, initializes `AgoraVoiceAI`, publishes the microphone, and renders transcript/state/metrics
   5. End call posts `/api/stopAgent`, logs out of RTM, and clears browser state
 - Error handling: `ErrorBoundary`, `ConnectionStatusPanel`, and issue aggregation in `ConversationComponent`

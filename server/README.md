@@ -14,21 +14,24 @@ vendor registry — **BYO-only, not zero-key**:
 The realtime MLLM vendor replaces the cascading STT→LLM→TTS with a single
 realtime model. The leg is built from `server/src/vendors.py` (`build_vendor`)
 and attached with `.with_mllm()` only — no `.with_stt/.with_llm/.with_tts`. The
-selected vendor's API key is required and is validated at agent start (not server
-boot), so the server starts even if the key is absent, but `/startAgent` returns
-400 until the key is configured.
+selected vendor's provider credentials are required and are validated at agent start
+(not server boot), so the server starts even if they are absent, but `/startAgent`
+returns 400 until they are configured.
 
 There is **no separate `llm/` service** in this recipe.
 
 ## Vendors
 
-`server/src/vendors.py` holds `CATEGORY = "REALTIME"` and the `SPECS` table for
-all four A4.1 realtime vendors. Select one with `REALTIME_VENDOR` (default
-`openai`); optionally override the model with `REALTIME_MODEL`.
+`server/src/vendors.py` holds `CATEGORY = "REALTIME"` and the registry for
+OpenAI Realtime, Azure OpenAI Realtime, Gemini Live, xAI Grok, and Vertex AI. Select one with `REALTIME_VENDOR` (default
+`openai`); the UI may override this per request; optionally override the model with
+`REALTIME_MODEL` where supported.
+Azure uses its required `AZURE_OPENAI_REALTIME_MODEL` deployment setting.
 
 | `REALTIME_VENDOR` | Required env | Default model |
 | --- | --- | --- |
 | `openai` | `OPENAI_API_KEY` | `gpt-4o-realtime-preview` |
+| `azure` | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_REALTIME_URL`, `AZURE_OPENAI_REALTIME_MODEL` | Azure deployment |
 | `gemini` | `GEMINI_API_KEY` | `gemini-2.0-flash-live-001` |
 | `xai` | `XAI_API_KEY` | _(SDK default)_ |
 | `vertexai` | `GOOGLE_APPLICATION_CREDENTIALS_JSON`, `GOOGLE_PROJECT_ID`, `GOOGLE_LOCATION` | `gemini-2.0-flash-live-001` |
@@ -51,7 +54,7 @@ python src/server.py
 
 - `AGORA_APP_ID` — Agora project App ID.
 - `AGORA_APP_CERTIFICATE` — Agora project App Certificate.
-- The selected vendor's key(s) — see the [Vendors](#vendors) table (BYO-only;
+- The selected vendor's credentials — see the [Vendors](#vendors) table (BYO-only;
   validated at agent start).
 
 Optional:
@@ -59,11 +62,13 @@ Optional:
 | Variable | Default | Notes |
 | --- | :---: | --- |
 | `REALTIME_VENDOR` | `openai` | Which realtime MLLM vendor to build |
-| `REALTIME_MODEL` | per-vendor | Optional model override for the selected vendor |
+| `REALTIME_MODEL` | per-vendor | Optional model override where supported; Azure uses its deployment setting |
+| `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_REALTIME_URL` / `AZURE_OPENAI_REALTIME_MODEL` | — | Required Azure key, complete WebSocket URL, and deployment/model name |
 | `AGENT_GREETING` | built-in | Optional opening line override |
 
 ## API
 
+- `GET /vendors` — list vendor options and the configured default
 - `GET /get_config` — token + channel/UID config
 - `POST /startAgent` — start an agent session
 - `POST /stopAgent` — stop an agent session
