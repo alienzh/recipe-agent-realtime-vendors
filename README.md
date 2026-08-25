@@ -93,6 +93,10 @@ function + the `REGISTRY` line.
 - **Provider credentials for your chosen realtime vendor** — set the env vars from the
   [Vendors](#vendors) table in `server/.env.local`
 
+The same commands work on macOS, Linux, and Windows. On macOS/Linux, setup uses
+`python3`; on Windows, it uses the Python launcher (`py`) or `python`. WSL and
+virtualenv activation are not required.
+
 ## Run It
 
 ```bash
